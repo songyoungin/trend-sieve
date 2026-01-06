@@ -12,8 +12,12 @@ trend-sieve는 GitHub Trending에서 저장소를 수집하고, Gemini AI로 관
 # 의존성 설치
 uv sync
 
-# CLI 실행
+# CLI 실행 (기본: 전체 언어, daily)
 uv run trend-sieve
+
+# CLI 옵션
+uv run trend-sieve --lang python --since weekly
+uv run trend-sieve -l rust -s monthly
 
 # 린트/포맷/타입 검사 (pre-commit)
 uv run pre-commit run --all-files
@@ -23,7 +27,7 @@ uv run pre-commit run --all-files
 
 ```
 src/trend_sieve/
-├── main.py          # CLI 엔트리포인트, 파이프라인 오케스트레이션
+├── main.py          # CLI 엔트리포인트 (typer + rich), 파이프라인 오케스트레이션
 ├── config.py        # pydantic-settings 기반 설정 (환경변수, 관심 키워드)
 ├── models.py        # Pydantic 모델 (Repository, FilteredRepository)
 ├── sources/         # 데이터 수집 계층

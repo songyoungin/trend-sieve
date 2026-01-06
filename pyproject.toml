@@ -10,10 +10,12 @@ dependencies = [
     "google-genai>=1.0.0",
     "pydantic>=2.10.0",
     "pydantic-settings>=2.7.0",
+    "typer>=0.21.0",
+    "rich>=14.2.0",
 ]
 
 [project.scripts]
-trend-sieve = "trend_sieve.main:main"
+trend-sieve = "trend_sieve.main:app"
 
 [build-system]
 requires = ["hatchling"]
@@ -53,7 +55,7 @@ strict = true
 ignore_missing_imports = true
 explicit_package_bases = true
 mypy_path = "src"
-disable_error_code = ["misc"]
+disable_error_code = ["misc", "untyped-decorator"]
 
 [tool.bandit]
 exclude_dirs = ["tests"]

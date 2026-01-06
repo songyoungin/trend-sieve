@@ -1,15 +1,24 @@
 """Gemini 기반 필터링 모듈."""
 
-import json
 import logging
 
 from google import genai
 from google.genai import types
+from pydantic import BaseModel, Field
 
 from trend_sieve.config import settings
 from trend_sieve.models import FilteredRepository, Repository
 
 logger = logging.getLogger(__name__)
+
+
+class _FilteredItem(BaseModel):
+    """Gemini 응답용 스키마."""
+
+    index: int = Field(description="저장소 번호 (1부터 시작)")
+    relevance_score: int = Field(ge=1, le=10, description="관련성 점수 (1-10)")
+    matched_interests: list[str] = Field(description="매칭된 관심 키워드")
+    summary: str = Field(description="한국어 요약 (2-3문장)")
 
 
 class GeminiFilter:
@@ -56,56 +65,26 @@ class GeminiFilter:
 2. 관련성이 {self.threshold}점 이상인 저장소만 선택하세요.
 3. 선택된 저장소에 대해 한국어로 2-3문장 요약을 작성하세요.
 
-## 출력 형식 (JSON)
-```json
-[
-  {{
-    "index": 1,
-    "relevance_score": 8,
-    "matched_interests": ["LLM", "AI Agent"],
-    "summary": "이 저장소는..."
-  }}
-]
-```
+관련 없는 저장소는 출력에서 제외하세요. 관련 저장소가 없으면 빈 배열을 반환하세요."""
 
-관련 없는 저장소는 출력에서 제외하세요. 관련 저장소가 없으면 빈 배열 `[]`을 반환하세요."""
-
-    def _parse_response(
+    def _build_results(
         self,
-        response_text: str,
+        items: list[_FilteredItem],
         repositories: list[Repository],
     ) -> list[FilteredRepository]:
-        """Gemini 응답을 파싱한다."""
-        # JSON 블록 추출
-        text = response_text.strip()
-        if "```json" in text:
-            start = text.find("```json") + 7
-            end = text.find("```", start)
-            text = text[start:end].strip()
-        elif "```" in text:
-            start = text.find("```") + 3
-            end = text.find("```", start)
-            text = text[start:end].strip()
-
-        try:
-            items = json.loads(text)
-        except json.JSONDecodeError as e:
-            logger.warning("JSON 파싱 실패: %s", e)
-            return []
-
+        """응답 아이템을 FilteredRepository로 변환한다."""
         results = []
         for item in items:
-            idx = item.get("index", 0) - 1
+            idx = item.index - 1
             if 0 <= idx < len(repositories):
                 results.append(
                     FilteredRepository(
                         repository=repositories[idx],
-                        relevance_score=item.get("relevance_score", 0),
-                        summary=item.get("summary", ""),
-                        matched_interests=item.get("matched_interests", []),
+                        relevance_score=item.relevance_score,
+                        summary=item.summary,
+                        matched_interests=item.matched_interests,
                     )
                 )
-
         return results
 
     async def filter(
@@ -124,6 +103,8 @@ class GeminiFilter:
             config=types.GenerateContentConfig(
                 temperature=0.3,
                 max_output_tokens=4096,
+                response_mime_type="application/json",
+                response_schema=list[_FilteredItem],
             ),
         )
 
@@ -131,4 +112,10 @@ class GeminiFilter:
             logger.warning("Gemini 응답이 비어있음")
             return []
 
-        return self._parse_response(response.text, repositories)
+        # Structured Output이므로 파싱된 결과를 바로 사용
+        items = response.parsed
+        if items is None:
+            logger.warning("Gemini 응답 파싱 실패")
+            return []
+
+        return self._build_results(items, repositories)
