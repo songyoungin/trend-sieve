@@ -24,10 +24,10 @@ CREATE TABLE trend_items (
 );
 
 -- 인덱스 생성
+-- 참고: UNIQUE(source, source_id) 제약조건이 자동으로 유니크 인덱스를 생성함
 CREATE INDEX idx_trend_items_source ON trend_items(source);
 CREATE INDEX idx_trend_items_first_seen ON trend_items(first_seen_at DESC);
 CREATE INDEX idx_trend_items_relevance ON trend_items(relevance_score DESC);
-CREATE INDEX idx_trend_items_source_id ON trend_items(source, source_id);
 
 -- RLS (Row Level Security) 활성화
 ALTER TABLE trend_items ENABLE ROW LEVEL SECURITY;
@@ -38,4 +38,6 @@ CREATE POLICY "Public read access" ON trend_items
 
 -- Service role만 쓰기 가능
 CREATE POLICY "Service role write access" ON trend_items
-  FOR ALL USING (auth.role() = 'service_role');
+  FOR ALL
+  USING (auth.role() = 'service_role')
+  WITH CHECK (auth.role() = 'service_role');
