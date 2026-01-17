@@ -47,5 +47,12 @@ class Settings(BaseSettings):
         description="관련성 점수 임계값 (1-10)",
     )
 
+    # Supabase
+    supabase_url: str | None = Field(default=None, description="Supabase URL")
+    supabase_key: str | None = Field(default=None, description="Supabase anon key")
+
+    # Slack
+    slack_webhook_url: str | None = Field(default=None, description="Slack Webhook URL")
+
 
 settings = Settings()
