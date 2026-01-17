@@ -96,6 +96,36 @@ uv run trend-sieve --lang python --since weekly
 
 `config.py`에서 관심 키워드와 관련성 임계값을 수정할 수 있습니다.
 
+## 클라우드 모니터링 (선택)
+
+GitHub Actions를 통해 매일 자동으로 트렌드를 수집하고 Slack으로 알림받을 수 있습니다.
+
+### 설정
+
+1. **Supabase 프로젝트 생성**
+   - [Supabase](https://supabase.com)에서 새 프로젝트 생성
+   - `docs/supabase-schema.sql` 실행하여 테이블 생성
+
+2. **Slack Webhook 생성**
+   - [Slack API](https://api.slack.com/apps)에서 앱 생성
+   - Incoming Webhooks 활성화 후 URL 복사
+
+3. **GitHub Secrets 설정**
+   - `GEMINI_API_KEY`: Gemini API 키
+   - `SUPABASE_URL`: Supabase 프로젝트 URL
+   - `SUPABASE_KEY`: Supabase anon key
+   - `SLACK_WEBHOOK_URL`: Slack Webhook URL
+
+4. **수동 실행 테스트**
+   - Actions 탭 → "Daily Trend Sieve" → "Run workflow"
+
+### 데이터 소스
+
+| 소스 | 설명 |
+|------|------|
+| GitHub Trending | 일간 인기 저장소 |
+| Hacker News | Top Stories |
+
 ## 라이선스
 
 MIT
