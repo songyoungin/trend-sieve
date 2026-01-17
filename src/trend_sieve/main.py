@@ -9,8 +9,10 @@ from rich.console import Console
 from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
+from rich.syntax import Syntax
 from rich.table import Table
 
+from trend_sieve.enrichers import ReadmeEnricher
 from trend_sieve.filters import GeminiFilter
 from trend_sieve.models import FilteredRepository
 from trend_sieve.sources import GitHubTrendingSource
@@ -51,17 +53,24 @@ def _render_results(filtered: list[FilteredRepository]) -> None:
     table.add_column("언어", width=12)
     table.add_column("⭐ Stars", justify="right", width=15)
     table.add_column("관련성", justify="center", width=8)
+    table.add_column("라이선스", width=12)
 
     for i, item in enumerate(filtered, 1):
         repo = item.repository
         stars_text = f"{repo.stars:,} [green](+{repo.stars_today:,})[/green]"
         relevance_text = f"[{'green' if item.relevance_score >= 8 else 'yellow'}]{item.relevance_score}/10[/]"
+        license_text = (
+            f"[green]{item.license}[/green]"
+            if item.is_open_source
+            else f"[dim]{item.license or '-'}[/dim]"
+        )
         table.add_row(
             str(i),
             f"[link={repo.url}]{repo.name}[/link]",
             repo.language or "-",
             stars_text,
             relevance_text,
+            license_text,
         )
 
     console.print(table)
@@ -72,10 +81,38 @@ def _render_results(filtered: list[FilteredRepository]) -> None:
         repo = item.repository
         keywords = ", ".join(item.matched_interests)
 
-        header = f"[bold]{i}. {repo.name}[/bold]  [dim]|[/dim]  🏷️ {keywords}"
+        # 라이선스 배지
+        license_badge = (
+            f"[green]📜 {item.license}[/green]"
+            if item.is_open_source
+            else f"[dim]📜 {item.license or 'Unknown'}[/dim]"
+        )
+        header = f"[bold]{i}. {repo.name}[/bold]  [dim]|[/dim]  🏷️ {keywords}  [dim]|[/dim]  {license_badge}"
         content = f"{item.summary}\n\n[dim]🔗 {repo.url}[/dim]"
 
         console.print(Panel(Markdown(content), title=header, border_style="blue"))
+
+        # 예제 코드 출력 (오픈소스인 경우만)
+        if item.is_open_source and item.code_examples:
+            example = item.code_examples[0]  # 첫 번째 예제만 표시
+            console.print(
+                Panel(
+                    Syntax(
+                        example.code,
+                        example.language,
+                        theme="monokai",
+                        line_numbers=True,
+                        word_wrap=True,
+                    ),
+                    title="[cyan]📝 Quick Start[/cyan]",
+                    border_style="dim",
+                )
+            )
+        elif not item.is_open_source:
+            console.print(
+                "[dim]  ⚠️ 오픈소스 라이선스가 아니므로 예제 코드를 표시하지 않습니다.[/dim]"
+            )
+
         console.print()
 
 
@@ -101,17 +138,46 @@ async def _run(language: str | None, since: str) -> None:
             console.print("[yellow]수집된 저장소가 없습니다.[/yellow]")
             return
 
-        # 2. Gemini로 필터링 및 요약
-        task = progress.add_task("AI 필터링 및 요약 중...", total=None)
-        gemini_filter = GeminiFilter()
-        filtered = await gemini_filter.filter(repositories)
+        # 2. README와 라이선스 정보 수집 (병렬)
+        task = progress.add_task("README 및 라이선스 정보 수집 중...", total=None)
+        enricher = ReadmeEnricher()
+        repo_names = [repo.name for repo in repositories]
+        enrichments = await enricher.fetch_metadata_many(repo_names)
+
+        readmes = {name: e["readme"] for name, e in enrichments.items() if e["readme"]}
+        licenses = {name: e["license"] for name, e in enrichments.items()}
+        open_source_set = {
+            name for name, e in enrichments.items() if e["is_open_source"]
+        }
+
         progress.update(
             task,
-            description=f"[green]✓[/green] 필터링 완료: {len(filtered)}개 관련 저장소",
+            description=f"[green]✓[/green] 메타데이터 수집 완료: {len(readmes)}개 README",
         )
         progress.remove_task(task)
 
-    # 3. 결과 출력
+        # 3. Gemini로 필터링, 요약, Quick Start 코드 추출 (1회 API 호출)
+        task = progress.add_task(
+            "AI 분석 중 (필터링 + 요약 + 예제 코드)...", total=None
+        )
+        gemini_filter = GeminiFilter()
+        filtered = await gemini_filter.filter(
+            repositories,
+            readmes=readmes,
+            licenses=licenses,
+            open_source_set=open_source_set,
+        )
+        progress.update(
+            task,
+            description=f"[green]✓[/green] 분석 완료: {len(filtered)}개 관련 저장소",
+        )
+        progress.remove_task(task)
+
+        if not filtered:
+            console.print("\n[yellow]관심 키워드와 관련된 저장소가 없습니다.[/yellow]")
+            return
+
+    # 4. 결과 출력
     _render_results(filtered)
 
 

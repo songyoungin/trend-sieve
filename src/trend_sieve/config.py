@@ -14,7 +14,7 @@ class Settings(BaseSettings):
 
     gemini_api_key: str = Field(description="Gemini API 키")
     gemini_model: str = Field(
-        default="gemini-2.5-flash-preview-05-20",
+        default="gemini-2.0-flash",
         description="사용할 Gemini 모델",
     )
 

@@ -15,6 +15,13 @@ class Repository(BaseModel):
     forks: int = Field(default=0, description="포크 수")
 
 
+class CodeExample(BaseModel):
+    """코드 예제."""
+
+    language: str = Field(description="프로그래밍 언어")
+    code: str = Field(description="코드 내용")
+
+
 class FilteredRepository(BaseModel):
     """필터링된 저장소 정보 (요약 포함)."""
 
@@ -24,4 +31,10 @@ class FilteredRepository(BaseModel):
     matched_interests: list[str] = Field(
         default_factory=list,
         description="매칭된 관심 키워드",
+    )
+    license: str | None = Field(default=None, description="라이선스 SPDX ID")
+    is_open_source: bool = Field(default=False, description="오픈소스 여부")
+    code_examples: list[CodeExample] = Field(
+        default_factory=list,
+        description="README에서 추출한 예제 코드",
     )

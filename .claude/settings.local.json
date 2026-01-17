@@ -3,7 +3,9 @@
     "allow": [
       "Bash(cat:*)",
       "WebFetch(domain:github.com)",
-      "Bash(uv add:*)"
+      "Bash(uv add:*)",
+      "Bash(GEMINI_API_KEY=dummy uv run:*)",
+      "WebSearch"
     ]
   }
 }
