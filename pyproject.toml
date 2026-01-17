@@ -17,6 +17,7 @@ dependencies = [
 
 [project.scripts]
 trend-sieve = "trend_sieve.main:app"
+trend-sieve-scheduler = "trend_sieve.scheduler:main"
 
 [build-system]
 requires = ["hatchling"]
